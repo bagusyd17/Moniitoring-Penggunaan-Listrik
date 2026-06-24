@@ -28,6 +28,7 @@
         .card { background: var(--bg-card); padding: 16px 20px; border-radius: 10px; text-align: left; border-top: 3px solid var(--neon-blue); }
         .card-title { font-size: 11px; color: #6b7c96; text-transform: uppercase; font-weight: 700; }
         .card-value { font-size: 22px; font-weight: bold; margin-top: 6px; }
+        
         @keyframes denyut-merah {
             0% { box-shadow: 0 0 5px var(--neon-red); border-color: var(--neon-red); transform: scale(1); }
             50% { box-shadow: 0 0 25px var(--neon-red); border-color: #ff5252; transform: scale(1.01); }
@@ -39,8 +40,8 @@
 </head>
 <body>
     <div class="header">
-        <h1>Monitoring Penggunaan Listrik</h1>
-        <div class="ip-tag">Status Koneksi Cloud: <span id="mqtt-status" style="color:red">Terputus</span></div>
+        <h1>PROJECT SISMIK YUDA, NAWWAF, BAYU</h1>
+        <div class="ip-tag">Status Koneksi Cloud: <span id="mqtt-status" style="color:red; font-size:16px;">Menghubungkan Jalur...</span></div>
         <button class="btn-notif" onclick="aktifkanFiturKeamanan()">🔔 Aktifkan Sistem Notifikasi & Alarm</button>
     </div>
     <div class="container">
@@ -79,7 +80,7 @@
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if ("Notification" in window) {
                 Notification.requestPermission().then(perm => {
-                    if (perm === "granted") alert("Sistem IoT Jauh Aktif!");
+                    if (perm === "granted") alert("Sistem Keamanan Kelompok Aktif!");
                 });
             }
         }
@@ -94,19 +95,18 @@
             } catch(e) {}
         }
 
-        // KONEKSI KE BROKER HIVEMQ OVER WEBSOCKETS (PORT 8000)
+        // KONEKSI UTAMA JALUR WEBSOCKET MQTT BROKER HIVEMQ PUBLIC
         const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
 
         client.on('connect', () => {
-            document.getElementById('mqtt-status').innerText = "Terhubung";
+            document.getElementById('mqtt-status').innerText = "Terhubung Terbuka Global";
             document.getElementById('mqtt-status').style.color = "#00e676";
-            client.subscribe('sismik/yuda_nawwaf_bayu/data'); // Menyimak topik awan ESP32
+            client.subscribe('sismik/yuda_nawwaf_bayu/data'); 
         });
 
         client.on('message', (topic, message) => {
             try {
                 const data = JSON.parse(message.toString());
-                
                 document.getElementById('v-val').innerText = data.v.toFixed(1) + ' V';
                 document.getElementById('p-val').innerText = data.p.toFixed(1) + ' W';
                 document.getElementById('i-val').innerText = data.i.toFixed(2) + ' A';
@@ -128,7 +128,6 @@
                 pFill.style.strokeDashoffset = MAX_STROKE - ((Math.min(100, Math.max(0, (data.p / data.max_p) * 100)) / 100) * MAX_STROKE);
 
                 const sCard = document.getElementById('status-card'), sVal = document.getElementById('status-val');
-                
                 if (data.conn === 0) {
                     sCard.className = "status-card"; sCard.style.borderBottomColor = '#ffc107';
                     sVal.innerText = 'PZEM ERROR / AC OFF'; sVal.style.color = '#ffc107'; pFill.style.stroke = "transparent";
