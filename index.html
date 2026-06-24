@@ -95,7 +95,7 @@
             } catch(e) {}
         }
 
-        // PERBAIKAN UTAMA: MENGGUNAKAN WSS SECURE PORT 8884 AGAR CHROME TIDAK MEMBLOKIR
+        // MENGGUNAKAN SECURE PORT WSS 8884 UNTUK PROTOKOL HTTPS GITHUB PAGES
         const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
         client.on('connect', () => {
