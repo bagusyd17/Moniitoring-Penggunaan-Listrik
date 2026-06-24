@@ -95,8 +95,8 @@
             } catch(e) {}
         }
 
-        // KONEKSI UTAMA JALUR WEBSOCKET MQTT BROKER HIVEMQ PUBLIC
-        const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
+        // PERBAIKAN UTAMA: MENGGUNAKAN WSS SECURE PORT 8884 AGAR CHROME TIDAK MEMBLOKIR
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
         client.on('connect', () => {
             document.getElementById('mqtt-status').innerText = "Terhubung Terbuka Global";
