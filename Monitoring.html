@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PROJECT SISMIK YUDA, NAWWAF, BAYU</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        :root { --bg-main: #0a0f1d; --bg-card: #131a30; --neon-blue: #00d2ff; --neon-green: #00e676; --neon-red: #ff1744; --text-primary: #ffffff; }
+        body { font-family: sans-serif; background-color: var(--bg-main); color: var(--text-primary); margin: 0; padding: 20px; text-align: center; }
+        h1 { margin: 5px; font-size: 26px; text-transform: uppercase; letter-spacing: 1px; }
+        .ip-tag { color: #00e5ff; font-size: 14px; margin-bottom: 20px; font-weight: bold; }
+        .container { width: 100%; max-width: 1300px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .btn-notif { background: linear-gradient(45deg, #0072ff, #00d2ff); color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 20px; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(0,210,255,0.4); }
+        .status-card { width: 100%; box-sizing: border-box; background: var(--bg-card); padding: 15px; border-radius: 12px; border-bottom: 4px solid #666; transition: all 0.3s ease; }
+        .status-title { font-size: 12px; color: #6b7c96; text-transform: uppercase; font-weight: 600; }
+        .status-value { font-size: 24px; font-weight: bold; margin-top: 3px; }
+        .gauge-area { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; width: 100%; }
+        .gauge-widget { background: var(--bg-card); padding: 20px 10px; border-radius: 14px; width: 240px; display: flex; flex-direction: column; align-items: center; position: relative; }
+        .gauge-meter { position: relative; width: 200px; height: 105px; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .gauge-svg { width: 200px; height: 110px; }
+        .gauge-track { fill: none; stroke: #1f294d; stroke-width: 8; stroke-linecap: round; }
+        .gauge-cover { fill: none; stroke: #1f294d; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 125.6; stroke-dashoffset: 125.6; transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease; }
+        .gauge-marker { fill: none; stroke: var(--neon-red); stroke-width: 6; stroke-dasharray: 0.1 125.6; stroke-linecap: square; }
+        .gauge-limits { display: flex; justify-content: space-between; width: 175px; font-size: 12px; color: #5c6e8c; font-weight: 600; margin-top: -12px; margin-bottom: 5px; }
+        .gauge-value { font-size: 26px; font-weight: bold; }
+        .gauge-label { font-size: 12px; color: #6b7c96; text-transform: uppercase; }
+        .widget-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 100%; box-sizing: border-box; }
+        .card { background: var(--bg-card); padding: 16px 20px; border-radius: 10px; text-align: left; border-top: 3px solid var(--neon-blue); }
+        .card-title { font-size: 11px; color: #6b7c96; text-transform: uppercase; font-weight: 700; }
+        .card-value { font-size: 22px; font-weight: bold; margin-top: 6px; }
+        @keyframes denyut-merah {
+            0% { box-shadow: 0 0 5px var(--neon-red); border-color: var(--neon-red); transform: scale(1); }
+            50% { box-shadow: 0 0 25px var(--neon-red); border-color: #ff5252; transform: scale(1.01); }
+            100% { box-shadow: 0 0 5px var(--neon-red); border-color: var(--neon-red); transform: scale(1); }
+        }
+        .status-overload { animation: denyut-merah 1.2s infinite ease-in-out; }
+        @media (max-width: 768px) { .widget-grid { grid-template-columns: repeat(2, 1fr); } .gauge-area { gap: 15px; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Monitoring Penggunaan Listrik</h1>
+        <div class="ip-tag">Status Koneksi Cloud: <span id="mqtt-status" style="color:red">Terputus</span></div>
+        <button class="btn-notif" onclick="aktifkanFiturKeamanan()">🔔 Aktifkan Sistem Notifikasi & Alarm</button>
+    </div>
+    <div class="container">
+        <div id="status-card" class="status-card">
+            <div class="status-title">Status Kelistrikan Sistem</div>
+            <div id="status-val" class="status-value">-</div>
+        </div>
+        <div class="gauge-area">
+            <div class="gauge-widget">
+                <div class="gauge-meter"><svg class="gauge-svg" viewBox="0 0 100 60"><path class="gauge-track" d="M 10 50 A 40 40 0 0 1 90 50" /><path class="gauge-cover" id="g-v-fill" d="M 10 50 A 40 40 0 0 1 90 50" /></svg></div>
+                <div class="gauge-limits"><span>0V</span><span>260V</span></div>
+                <div class="gauge-value" id="v-val">0.0 V</div>
+                <div class="gauge-label">Tegangan Jaringan</div>
+            </div>
+            <div class="gauge-widget">
+                <div class="gauge-meter"><svg class="gauge-svg" viewBox="0 0 100 60"><path class="gauge-track" d="M 10 50 A 40 40 0 0 1 90 50" /><path class="gauge-cover" id="g-p-fill" d="M 10 50 A 40 40 0 0 1 90 50" /><path class="gauge-marker" id="g-p-marker" d="M 10 50 A 40 40 0 0 1 90 50" /></svg></div>
+                <div class="gauge-limits"><span>0W</span><span id="txt-max-p">980W</span></div>
+                <div class="gauge-value" id="p-val">0.0 W</div>
+                <div class="gauge-label">Daya Aktif Beban</div>
+            </div>
+        </div>
+        <div class="widget-grid">
+            <div class="card"><div class="card-title">ARUS LISTRIK</div><div class="card-value" id="i-val">0.00 A</div></div>
+            <div class="card" style="border-top-color:#a64eff;"><div class="card-title">TOTAL ENERGI (kWh)</div><div class="card-value" id="e-val">0.0000 kWh</div></div>
+            <div class="card" style="border-top-color:#ffaa00;"><div class="card-title">FREKUENSI</div><div class="card-value" id="f-val">0.0 Hz</div></div>
+            <div class="card" style="border-top-color:#00e5ff;"><div class="card-title">DAYA SEMU (S)</div><div class="card-value" id="s-val">0.0 VA</div></div>
+            <div class="card" style="border-top-color:#ff00dc;"><div class="card-title">DAYA REAKTIF (Q)</div><div class="card-value" id="q-val">0.0 VAR</div></div>
+            <div class="card" style="border-top-color:#ffff00;"><div class="card-title">COS PHI (PF)</div><div class="card-value" id="pf-val">0.00</div></div>
+        </div>
+    </div>
+    <script>
+        const MAX_STROKE = 125.6;
+        let audioCtx = null, alarmInterval = null, waktuTerakhirAlert = 0;
+
+        function aktifkanFiturKeamanan() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if ("Notification" in window) {
+                Notification.requestPermission().then(perm => {
+                    if (perm === "granted") alert("Sistem IoT Jauh Aktif!");
+                });
+            }
+        }
+
+        function bunyikanBeep() {
+            try {
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                osc.type = "sine"; osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime); osc.connect(gain);
+                gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.15); 
+            } catch(e) {}
+        }
+
+        // KONEKSI KE BROKER HIVEMQ OVER WEBSOCKETS (PORT 8000)
+        const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
+
+        client.on('connect', () => {
+            document.getElementById('mqtt-status').innerText = "Terhubung";
+            document.getElementById('mqtt-status').style.color = "#00e676";
+            client.subscribe('sismik/yuda_nawwaf_bayu/data'); // Menyimak topik awan ESP32
+        });
+
+        client.on('message', (topic, message) => {
+            try {
+                const data = JSON.parse(message.toString());
+                
+                document.getElementById('v-val').innerText = data.v.toFixed(1) + ' V';
+                document.getElementById('p-val').innerText = data.p.toFixed(1) + ' W';
+                document.getElementById('i-val').innerText = data.i.toFixed(2) + ' A';
+                document.getElementById('e-val').innerText = data.e.toFixed(4) + ' kWh';
+                document.getElementById('f-val').innerText = data.f.toFixed(1) + ' Hz';
+                document.getElementById('s-val').innerText = data.s.toFixed(1) + ' VA';
+                document.getElementById('q-val').innerText = data.q.toFixed(1) + ' VAR';
+                document.getElementById('pf-val').innerText = data.pf.toFixed(2);
+                document.getElementById('txt-max-p').innerText = data.max_p + 'W';
+
+                let markerOffset = MAX_STROKE - ((data.limit / data.max_p) * MAX_STROKE);
+                document.getElementById('g-p-marker').style.strokeDashoffset = markerOffset;
+
+                let vFill = document.getElementById('g-v-fill');
+                vFill.style.strokeDashoffset = MAX_STROKE - ((Math.min(100, Math.max(0, (data.v / 260) * 100)) / 100) * MAX_STROKE);
+                vFill.style.stroke = (data.v <= 0.5) ? "transparent" : ((data.v >= 200 && data.v <= 240) ? "var(--neon-blue)" : "var(--neon-red)");
+
+                let pFill = document.getElementById('g-p-fill');
+                pFill.style.strokeDashoffset = MAX_STROKE - ((Math.min(100, Math.max(0, (data.p / data.max_p) * 100)) / 100) * MAX_STROKE);
+
+                const sCard = document.getElementById('status-card'), sVal = document.getElementById('status-val');
+                
+                if (data.conn === 0) {
+                    sCard.className = "status-card"; sCard.style.borderBottomColor = '#ffc107';
+                    sVal.innerText = 'PZEM ERROR / AC OFF'; sVal.style.color = '#ffc107'; pFill.style.stroke = "transparent";
+                    clearInterval(alarmInterval); alarmInterval = null;
+                } else if (data.status === 'AMAN') {
+                    sCard.className = "status-card"; sCard.style.borderBottomColor = '#00e676';
+                    sVal.innerText = 'AMAN'; sVal.style.color = '#00e676';
+                    pFill.style.stroke = (data.p <= 0.5) ? "transparent" : "var(--neon-green)";
+                    clearInterval(alarmInterval); alarmInterval = null;
+                } else {
+                    sCard.className = "status-card status-overload"; sCard.style.borderBottomColor = 'var(--neon-red)';
+                    sVal.innerText = 'KURANGI BEBAN!'; sVal.style.color = 'var(--neon-red)'; pFill.style.stroke = "var(--neon-red)";
+                    
+                    if (!alarmInterval && audioCtx) {
+                        bunyikanBeep(); alarmInterval = setInterval(bunyikanBeep, 600); 
+                    }
+                    
+                    let waktuSekarang = Date.now();
+                    if (waktuSekarang - waktuTerakhirAlert >= 7000) {
+                        waktuTerakhirAlert = waktuSekarang;
+                        alert("🚨 PERINGATAN OVERLOAD GLOBAL!\nDaya kritis: " + data.p.toFixed(1) + " Watt!");
+                        if ("Notification" in window && Notification.permission === "granted") {
+                            new Notification("⚠️ BEBAN OVERLOAD!", { body: "Daya saat ini: " + data.p.toFixed(1) + " W." });
+                        }
+                    }
+                }
+            } catch(e) {}
+        });
+    </script>
+</body>
+</html>
