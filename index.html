@@ -42,8 +42,8 @@
 <body>
     <div class="header">
         <h1>MONITORING PENGGUNAAN LISTRIK</h1>
-        <div class="ip-tag">Status Koneksi Cloud: <span id="mqtt-status" style="color:#ffc107; font-size:16px;">Menghubungkan BOSSSQ...</span></div>
-        <div class="timestamp" id="last-update">Data terakhir diterima: Menunggu data...</div>
+        <div class="ip-tag">Status Sistem: <span id="mqtt-status" style="color:#ffc107; font-size:16px;">Menghubungkan Web ke Awan...</span></div>
+        <div class="timestamp" id="last-update">Data terakhir diterima: Menunggu alat menyala...</div>
         <button class="btn-notif" onclick="aktifkanFiturKeamanan()">🔔 Aktifkan Sistem Notifikasi & Alarm</button>
     </div>
     <div class="container">
@@ -80,6 +80,9 @@
     <script>
         const MAX_STROKE = 125.6;
         let audioCtx = null, alarmInterval = null, waktuTerakhirAlert = 0;
+        
+        // VARIABEL BARU UNTUK MENDETEKSI ESP32 MATI/PUTUS
+        let espWatchdog = null; 
 
         function aktifkanFiturKeamanan() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -100,37 +103,38 @@
             } catch(e) {}
         }
 
+        function setStatusESPMati() {
+            document.getElementById('mqtt-status').innerText = "Koneksi Alat Terputus (ESP32 Offline/Mati)!";
+            document.getElementById('mqtt-status').style.color = "var(--neon-red)";
+        }
+
         const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
-        // FITUR: Deteksi Koneksi Putus/Error Super Agresif
         client.on('connect', () => {
-            document.getElementById('mqtt-status').innerText = "Terhubung Terbuka Global";
-            document.getElementById('mqtt-status').style.color = "#00e676";
+            document.getElementById('mqtt-status').innerText = "Web Terhubung. Menunggu Alat Menyala...";
+            document.getElementById('mqtt-status').style.color = "#00d2ff"; // Warna biru saat nunggu alat
             client.subscribe('sismik/yuda_nawwaf_bayu/data'); 
         });
 
         client.on('offline', () => {
-            document.getElementById('mqtt-status').innerText = "Koneksi Terputus (Offline)!";
+            document.getElementById('mqtt-status').innerText = "Internet Web Terputus!";
             document.getElementById('mqtt-status').style.color = "var(--neon-red)";
-        });
-
-        client.on('error', (err) => {
-            document.getElementById('mqtt-status').innerText = "Error Jaringan Broker!";
-            document.getElementById('mqtt-status').style.color = "var(--neon-red)";
-        });
-
-        client.on('reconnect', () => {
-            document.getElementById('mqtt-status').innerText = "Mencoba Menghubungkan Ulang...";
-            document.getElementById('mqtt-status').style.color = "#ffc107";
         });
 
         client.on('message', (topic, message) => {
             try {
                 const data = JSON.parse(message.toString());
                 
-                // FITUR: Update Waktu Terakhir Diterima (Timestamp)
+                // MENGATUR ULANG WATCHDOG: Jika terima data, ESP32 berarti Online!
+                if(espWatchdog) clearTimeout(espWatchdog);
+                document.getElementById('mqtt-status').innerText = "Alat Online & Data Sinkron (Aman)";
+                document.getElementById('mqtt-status').style.color = "#00e676";
+                
+                // Set mundur 5 detik. Jika dalam 5 detik tidak ada data masuk, eksekusi setStatusESPMati
+                espWatchdog = setTimeout(setStatusESPMati, 5000);
+
                 const now = new Date();
-                const jamStr = now.toLocaleTimeString('id-ID'); // Format: HH:MM:SS
+                const jamStr = now.toLocaleTimeString('id-ID'); 
                 document.getElementById('last-update').innerText = "Data terakhir diterima: " + jamStr + " WIB";
 
                 document.getElementById('v-val').innerText = data.v.toFixed(1) + ' V';
